@@ -198,8 +198,9 @@
         .app-footer {
             position: fixed;
             bottom: 0; left: 0; right: 0;
+            height: var(--ftr);
             z-index: 900;
-            background: rgba(7,9,26,0.94);
+            background: rgba(7,9,26,0.92);
             backdrop-filter: var(--blur);
             -webkit-backdrop-filter: var(--blur);
             border-top: 1px solid var(--glass-border);
@@ -207,67 +208,39 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 3px;
-            padding: 8px 20px 7px;
+            gap: 1px;
+            padding: 0 16px;
         }
 
-        /* İsim + ünvan badge — tek satır */
-        .ftr-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 7px;
-            width: 100%;
-            max-width: 360px;
-        }
-
-        .ftr-name {
+        .ftr-brand {
             font-family: 'Syne', sans-serif;
-            font-size: 10.5px;
+            font-size: 11px;
             font-weight: 700;
             color: var(--t2);
-            white-space: nowrap;
-            flex-shrink: 0;
+            letter-spacing: 0.4px;
         }
 
-        .ftr-name em {
+        .ftr-brand em {
             font-style: normal;
             color: var(--blue);
         }
 
-        .ftr-badge {
-            font-size: 9px;
-            font-weight: 500;
+        .ftr-hospital {
+            font-size: 10px;
             color: var(--t3);
-            background: var(--glass);
-            border: 1px solid var(--glass-border);
-            border-radius: 50px;
-            padding: 1px 8px;
-            white-space: nowrap;
         }
 
-        /* Alt bilgi satırı */
-        .ftr-info {
-            display: flex;
-            align-items: center;
-            gap: 5px;
+        .ftr-device {
             font-size: 9px;
             color: var(--t4);
-            letter-spacing: 0.15px;
-            white-space: nowrap;
-        }
-
-        .ftr-dot {
-            width: 2px; height: 2px;
-            border-radius: 50%;
-            background: var(--t4);
-            flex-shrink: 0;
+            letter-spacing: 0.2px;
         }
 
         /* Safe area support (iPhone notch/home bar) */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             .app-footer {
-                padding-bottom: calc(env(safe-area-inset-bottom) + 7px);
+                padding-bottom: env(safe-area-inset-bottom);
+                height: calc(var(--ftr) + env(safe-area-inset-bottom));
             }
             .main-content {
                 padding-bottom: calc(var(--ftr) + env(safe-area-inset-bottom));
@@ -1058,7 +1031,18 @@
                 <div class="hdr-sub">Nazilli Devlet Hastanesi</div>
             </div>
         </div>
-        <div id="status" class="status connecting">🟡 Bağlanıyor</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <!-- PWA Yükle butonu — sadece prompt hazır olunca görünür -->
+            <button id="btn-pwa-install" class="hidden"
+                    onclick="installPWA()"
+                    style="background:var(--blue-dim); border:1px solid var(--blue);
+                           color:#7a9fff; font-size:11px; font-weight:600;
+                           padding:5px 10px; border-radius:50px; cursor:pointer;
+                           white-space:nowrap;">
+                ⬇ Yükle
+            </button>
+            <div id="status" class="status connecting">🟡 Bağlanıyor</div>
+        </div>
     </header>
 
     <!-- ╔══════════════════════════════╗
@@ -1320,23 +1304,9 @@
          ║       FIXED FOOTER          ║
          ╚══════════════════════════════╝ -->
     <footer class="app-footer">
-        <div class="ftr-row">
-            <div class="ftr-name"><em>MGDizayn</em> · Mustafa GÜNEŞDOĞDU</div>
-            <div class="ftr-badge">Bilgisayar Programcısı</div>
-        </div>
-        <div class="ftr-row">
-            <div class="ftr-name">Ahmet KAHREMAN</div>
-            <div class="ftr-badge">Bilgi İşlem Sorumlusu</div>
-        </div>
-        <div class="ftr-info">
-            <span>Nazilli Devlet Hastanesi</span>
-            <div class="ftr-dot"></div>
-            <span>v1.7</span>
-            <div class="ftr-dot"></div>
-            <span>15.03.2026</span>
-            <div class="ftr-dot"></div>
-            <span id="device-id"></span>
-        </div>
+        <div class="ftr-brand"><em>MGDizayn</em> • Mustafa GÜNEŞDOĞDU</div>
+        <div class="ftr-hospital">Nazilli Devlet Hastanesi — Bilgi İşlem</div>
+        <div class="ftr-device">Cihaz: <span id="device-id"></span>&nbsp;|&nbsp;v1.7&nbsp;|&nbsp;15.03.2026</div>
     </footer>
 
 
@@ -1712,26 +1682,18 @@
 
             const btn = document.getElementById('btn-onay-tamam');
             btn.disabled = true;
-            btn.innerHTML = '<span class="loading"></span> Onaylanıyor...';
+            btn.innerHTML = '<span class="loading"></span> Kaydediliyor...';
 
-            try {
-                const yanit = await sendMQTT('TALIMAT_ONAY', state.seciliBirimKodu, state.tcNo);
+            // Onay önce LOCAL olarak kaydedilir — sunucu bağımlı değil
+            state.talimatOnayli = true;
+            const onayKey = `onay_${state.tcNo}_${state.seciliBirimKodu}_${new Date().toISOString().split('T')[0]}`;
+            localStorage.setItem(onayKey, 'true');
 
-                if (yanit?.status === 'OK') {
-                    state.talimatOnayli = true;
-                    const onayKey = `onay_${state.tcNo}_${state.seciliBirimKodu}_${new Date().toISOString().split('T')[0]}`;
-                    localStorage.setItem(onayKey, 'true');
+            // MQTT'ye arka planda bildir (hata olursa sessizce geç)
+            sendMQTT('TALIMAT_ONAY', state.seciliBirimKodu, state.tcNo).catch(() => {});
 
-                    showInfoModal('✅ Onaylandı', 'Talimatları okuduğunuz onaylandı. Temizliğe başlayabilirsiniz.');
-                    backToConfirm();
-                } else {
-                    throw new Error(yanit?.message || 'Onay hatası');
-                }
-            } catch (err) {
-                showInfoModal('❌ Hata', `Onay gönderilemedi: ${err.message}`);
-                btn.disabled = false;
-                btn.textContent = '✓ Onayla ve Devam Et';
-            }
+            showInfoModal('✅ Onaylandı', 'Talimatları okuduğunuz onaylandı. Temizliğe başlayabilirsiniz.');
+            backToConfirm();
         }
 
         function backToConfirm() { showConfirmPage(); }
@@ -2063,6 +2025,36 @@
         window.addEventListener('load', () => {
             connectMQTT();
         });
+
+        // ==================== PWA INSTALL ====================
+        let pwaInstallPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            pwaInstallPrompt = e;
+            // "Yükle" butonunu göster
+            const btn = document.getElementById('btn-pwa-install');
+            if (btn) btn.classList.remove('hidden');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            pwaInstallPrompt = null;
+            const btn = document.getElementById('btn-pwa-install');
+            if (btn) btn.classList.add('hidden');
+            console.log('[PWA] Uygulama yüklendi');
+        });
+
+        function installPWA() {
+            if (!pwaInstallPrompt) return;
+            pwaInstallPrompt.prompt();
+            pwaInstallPrompt.userChoice.then((result) => {
+                if (result.outcome === 'accepted') {
+                    const btn = document.getElementById('btn-pwa-install');
+                    if (btn) btn.classList.add('hidden');
+                }
+                pwaInstallPrompt = null;
+            });
+        }
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
