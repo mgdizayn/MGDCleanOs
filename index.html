@@ -198,9 +198,8 @@
         .app-footer {
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            height: var(--ftr);
             z-index: 900;
-            background: rgba(7,9,26,0.92);
+            background: rgba(7,9,26,0.94);
             backdrop-filter: var(--blur);
             -webkit-backdrop-filter: var(--blur);
             border-top: 1px solid var(--glass-border);
@@ -208,39 +207,65 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 1px;
-            padding: 0 16px;
+            gap: 3px;
+            padding: 8px 20px 7px;
         }
 
-        .ftr-brand {
+        .ftr-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .ftr-name {
             font-family: 'Syne', sans-serif;
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 700;
             color: var(--t2);
-            letter-spacing: 0.4px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
-        .ftr-brand em {
+        .ftr-name em {
             font-style: normal;
             color: var(--blue);
         }
 
-        .ftr-hospital {
-            font-size: 10px;
+        .ftr-badge {
+            font-size: 9px;
+            font-weight: 500;
             color: var(--t3);
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 1px 8px;
+            white-space: nowrap;
         }
 
-        .ftr-device {
+        .ftr-info {
+            display: flex;
+            align-items: center;
+            gap: 5px;
             font-size: 9px;
             color: var(--t4);
-            letter-spacing: 0.2px;
+            letter-spacing: 0.15px;
+            white-space: nowrap;
+        }
+
+        .ftr-dot {
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            background: var(--t4);
+            flex-shrink: 0;
         }
 
         /* Safe area support (iPhone notch/home bar) */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
             .app-footer {
-                padding-bottom: env(safe-area-inset-bottom);
-                height: calc(var(--ftr) + env(safe-area-inset-bottom));
+                padding-bottom: calc(env(safe-area-inset-bottom) + 7px);
             }
             .main-content {
                 padding-bottom: calc(var(--ftr) + env(safe-area-inset-bottom));
@@ -1032,13 +1057,12 @@
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-            <!-- PWA Yükle butonu — sadece prompt hazır olunca görünür -->
             <button id="btn-pwa-install" class="hidden"
                     onclick="installPWA()"
                     style="background:var(--blue-dim); border:1px solid var(--blue);
                            color:#7a9fff; font-size:11px; font-weight:600;
                            padding:5px 10px; border-radius:50px; cursor:pointer;
-                           white-space:nowrap;">
+                           white-space:nowrap; font-family:'DM Sans',sans-serif;">
                 ⬇ Yükle
             </button>
             <div id="status" class="status connecting">🟡 Bağlanıyor</div>
@@ -1304,9 +1328,23 @@
          ║       FIXED FOOTER          ║
          ╚══════════════════════════════╝ -->
     <footer class="app-footer">
-        <div class="ftr-brand"><em>MGDizayn</em> • Mustafa GÜNEŞDOĞDU</div>
-        <div class="ftr-hospital">Nazilli Devlet Hastanesi — Bilgi İşlem</div>
-        <div class="ftr-device">Cihaz: <span id="device-id"></span>&nbsp;|&nbsp;v1.7&nbsp;|&nbsp;15.03.2026</div>
+        <div class="ftr-row">
+            <div class="ftr-name"><em>MGDizayn</em> · Mustafa GÜNEŞDOĞDU</div>
+            <div class="ftr-badge">Bilgisayar Programcısı</div>
+        </div>
+        <div class="ftr-row">
+            <div class="ftr-name">Ahmet KAHREMAN</div>
+            <div class="ftr-badge">Bilgi İşlem Sorumlusu</div>
+        </div>
+        <div class="ftr-info">
+            <span>Nazilli Devlet Hastanesi</span>
+            <div class="ftr-dot"></div>
+            <span>v1.7</span>
+            <div class="ftr-dot"></div>
+            <span>15.03.2026</span>
+            <div class="ftr-dot"></div>
+            <span id="device-id"></span>
+        </div>
     </footer>
 
 
@@ -1684,12 +1722,12 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="loading"></span> Kaydediliyor...';
 
-            // Onay önce LOCAL olarak kaydedilir — sunucu bağımlı değil
+            // Onay LOCAL olarak anında kaydedilir — sunucu cevabı beklenmez
             state.talimatOnayli = true;
             const onayKey = `onay_${state.tcNo}_${state.seciliBirimKodu}_${new Date().toISOString().split('T')[0]}`;
             localStorage.setItem(onayKey, 'true');
 
-            // MQTT'ye arka planda bildir (hata olursa sessizce geç)
+            // MQTT'ye arka planda bildir, hata olursa sessizce geç
             sendMQTT('TALIMAT_ONAY', state.seciliBirimKodu, state.tcNo).catch(() => {});
 
             showInfoModal('✅ Onaylandı', 'Talimatları okuduğunuz onaylandı. Temizliğe başlayabilirsiniz.');
@@ -2032,7 +2070,6 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             pwaInstallPrompt = e;
-            // "Yükle" butonunu göster
             const btn = document.getElementById('btn-pwa-install');
             if (btn) btn.classList.remove('hidden');
         });
@@ -2041,7 +2078,6 @@
             pwaInstallPrompt = null;
             const btn = document.getElementById('btn-pwa-install');
             if (btn) btn.classList.add('hidden');
-            console.log('[PWA] Uygulama yüklendi');
         });
 
         function installPWA() {
